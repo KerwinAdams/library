@@ -4,47 +4,43 @@
 #include<arpa/inet.h>
 #include<sys/types.h>
 #include<pthread.h>
-#include<signal.h>
 #include<stdlib.h>
 #include<unistd.h>
 #include<string.h>
+#include<signal.h>
 #include<fcntl.h>
 #include<stdio.h>
 #include<time.h>
 #include"dict.h"
 
-int log_fd = -1;
 
-void sig_handler(int sig) {
-
-    struct rlimit rlim;
-    int max_fd;
-    int fd;
-
-    if (getrlimit(RLIMIT_NOFILE, &rlim) == -1) {
-        max_fd = 1024;
-    }else{
-        max_fd = rlim.rlim_max;
-    }
-
-    for(fd = 3; fd < max_fd; fd++){
-        close(fd);
-    }
-
-    exit(0);
-}
+void* allocated_mem[1024] = { 0 };
+int mem_count = 0;
 
 int main(int argc, char* argv[]) {
-    printf("%d\n",getpid());
-    //daemon(0, 0);
+
+    signal(SIGINT, signal_handler);
+    daemonize();
     system_run(argc, argv);
     return 0;
 }
 
+//守护进程函数
+void daemonize() {
+
+    daemon(1, 0);
+    int fd = open("log.txt", O_WRONLY | O_APPEND | O_CREAT, 0666);
+    if (fd < 0) {
+        exit(0);
+    }
+    dup2(fd, 1);//标准输出重定向到log.txt
+    dup2(fd, 2);
+    close(fd);
+    return;
+}
+
 //系统运行函数
 void system_run(int argc, char* argv[]) {
-
-    signal(SIGINT, sig_handler);
 
     if (argc != 2) {
         return;
@@ -62,38 +58,10 @@ void system_run(int argc, char* argv[]) {
     return;
 }
 
-//日志初始化函数
-void log_init() {
-    log_fd = open("/temp/dcit_server_log.txt", O_WRONLY | O_APPEND | O_CREAT, 0666);
-    if (log_fd == -1) {
-        printf("open log file error\n");
-        exit(1);
-    }
-    return;
-}
-
-//服务器端日志记录函数
-int log_msg(char* str1, char* str2, char* str3) {
-    time_t now;
-    now = time(NULL);
-    char* time_str = asctime(localtime(&now));
-    time_str[strlen(time_str) - 1] = '\0';
-    char log_str[1024];
-    if (str2 == NULL) {
-        sprintf(log_str, "%s %s\n", time_str, str1);
-    } else if (str3 == NULL) {
-        sprintf(log_str, "%s %s %s\n", time_str, str1, str2);
-    } else {
-        sprintf(log_str, "%s %s %s %s\n", time_str, str1, str2, str3);
-    }
-    write(log_fd, log_str, strlen(log_str));
-    return 0;
-}
 
 //服务器初始化函数
 int server_init(char* argv[]) {
 
-    log_init();
 
     int sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (sockfd < 0) {
@@ -137,6 +105,12 @@ void server_loop(int fd) {
         log_msg(client_info, "connected", NULL);
 
         client_t* temp = (client_t*)malloc(sizeof(client_t));
+        if (temp == NULL) {
+            close(sockfd);
+            send_packet(sockfd, ERROR, 0, NULL);
+            continue;
+        }
+        reg_mem(temp);
         temp->sockfd = sockfd;
         temp->addr = client_addr;
 
@@ -167,21 +141,23 @@ void* client_thread(void* arg) {
     char client_info[128] = { 0 };
     sprintf(client_info, "client %s:%d", inet_ntoa(client.addr.sin_addr), ntohs(client.addr.sin_port));
 
+    //初始化数据库连接
     MYSQL mysql;
     if (db_init(&mysql) == -1) {
         log_msg(client_info, "database init error", NULL);
         send_packet(client.sockfd, ERROR, 0, NULL);
         goto cleanup;
+    } else {
+        log_msg(client_info, "database init success", NULL);
+        send_packet(client.sockfd, CORRECT, 0, NULL);
     }
 
-    log_msg(client_info, "database init success", NULL);
-    send_packet(client.sockfd, CORRECT, 0, NULL);
 
     packet_t packet;
     user_t user;
-
     while (1) {
         memset(&packet, 0, sizeof(packet_t));
+        //接收数据包
         if (recv(client.sockfd, &packet, sizeof(packet_t), 0) == 0) {
             break;
         }
@@ -191,50 +167,43 @@ void* client_thread(void* arg) {
             log_msg(client_info, "request register", NULL);
 
             int ret = request_register(&mysql, &packet, &user, client.sockfd);
-            switch (ret) {
-            case REG_SUCCESS:
+            if (ret == REG_SUCCESS) {
                 log_msg(client_info, "register success", NULL);
-                break;
-            case REG_FAILED:
+            } else if (ret == REG_FAILED) {
                 log_msg(client_info, "register failed", NULL);
-                break;
-            default:
+            } else {
                 log_msg(client_info, "register error", NULL);
-                break;
             }
 
         } else if (packet.type == LOGIN) {
 
             log_msg(client_info, "request login", NULL);
+
             int ret = request_login(&mysql, &packet, &user, client.sockfd);
-            switch (ret) {
-            case LOGIN_SUCCESS:
+            if (ret == LOGIN_SUCCESS) {
                 log_msg(client_info, "login success", NULL);
-                break;
-            case LOGIN_FAILED:
-                log_msg(client_info, "log_msgin failed", NULL);
-                break;
-            default:
-                log_msg(client_info, "log_msgin error", NULL);
-                break;
+            } else if (ret == LOGIN_FAILED) {
+                log_msg(client_info, "login failed", NULL);
+            } else {
+                log_msg(client_info, "login error", NULL);
             }
 
         } else if (packet.type == NEWPWD) {
 
             log_msg(client_info, "request newpwd", NULL);
+
             int ret = request_newpwd(&mysql, &packet, &user, client.sockfd);
-            switch (ret) {
-            case CORRECT:
+            if (ret == NEWPWD_SUCCESS) {
                 log_msg(client_info, "newpwd success", NULL);
-                break;
-            default:
+            } else {
                 log_msg(client_info, "newpwd error", NULL);
-                break;
             }
+
 
         } else if (packet.type == SEARCH) {
 
             log_msg(client_info, user.name, "request search");
+
             int ret = request_search(&mysql, &packet, client.sockfd);
             if (ret == SEARCH_SUCCESS) {
                 log_msg(client_info, user.name, "search success");
@@ -247,6 +216,7 @@ void* client_thread(void* arg) {
         } else if (packet.type == HISTORY) {
 
             log_msg(client_info, user.name, "request history");
+
             int ret = request_history(&mysql, &packet, &user, client.sockfd);
             if (ret == HISTORY_SUCCESS) {
                 log_msg(client_info, user.name, "history success");
@@ -262,18 +232,25 @@ void* client_thread(void* arg) {
     }
     log_msg(client_info, "disconnected", NULL);
 cleanup:
+    //关闭数据库连接
     mysql_close(&mysql);
+    //关闭套接字
     close(client.sockfd);
+    //释放内存
     free(arg);
     return NULL;
 }
 
-//数据包发送函数
+//数据包打包函数
 int send_packet(int sockfd, int type, size_t size, void* data) {
+    //申请内存
     packet_t* p = (packet_t*)malloc(sizeof(packet_t) + size);
     if (p == NULL) {
         return -1;
     }
+    //注册内存
+    reg_mem(p);
+    //填充数据
     p->type = type;
     p->size = size;
     if (data == NULL) {
@@ -289,4 +266,55 @@ int send_packet(int sockfd, int type, size_t size, void* data) {
     }
     free(p);
     return 0;
+}
+
+//服务器端日志记录函数
+int log_msg(char* str1, char* str2, char* str3) {
+    //获取当前时间
+    time_t now;
+    now = time(NULL);
+    char* time_str = asctime(localtime(&now));
+    //打印日志
+    if (str2 == NULL) {
+        printf("%s %s\n", time_str, str1);
+    } else if (str3 == NULL) {
+        printf("%s %s %s\n", time_str, str1, str2);
+    } else {
+        printf("%s %s %s %s\n", time_str, str1, str2, str3);
+    }
+    return 0;
+}
+
+//注册内存函数
+void reg_mem(void* ptr) {
+    if (mem_count < 1024) {
+        allocated_mem[mem_count++] = ptr;
+    }
+    return;
+}
+
+//信号处理函数
+void signal_handler(int sig) {
+
+    struct rlimit rl;
+    getrlimit(RLIMIT_NOFILE, &rl);
+    int max_fd = rl.rlim_max;
+
+    //关闭所有文件描述符
+    for (int fd = 3; fd < max_fd; fd++) {
+        close(fd);
+    }
+    close(0);
+    close(1);
+    close(2);
+    //释放所有分配的内存
+    for (int i = 0; i < mem_count; i++) {
+        if (allocated_mem[i]) {
+            free(allocated_mem[i]);
+            allocated_mem[i] = NULL;
+        }
+    }
+    mem_count = 0;
+    //退出程序
+    exit(0);
 }

@@ -17,19 +17,19 @@ void client_function(int sockfd, packet_t* packet, user_t* user);
 int main(int argc, char* argv[]) {
 
     int sockfd = client_init(argc, argv);
-    if(sockfd == -1){
+    if (sockfd == -1) {
         prompt(1, "Client init error!", 3);
         return -1;
     }
 
     packet_t client_start;
     recv(sockfd, &client_start, sizeof(packet_t), 0);
-    if(client_start.type == ERROR){
+    if (client_start.type == ERROR) {
         printf("Server error, please try again later!\n");
         return -1;
     }
     recv(sockfd, &client_start, sizeof(packet_t), 0);
-    if(client_start.type == ERROR){
+    if (client_start.type == ERROR) {
         printf("Database init error, please try again later!\n");
         return -1;
     }
@@ -105,7 +105,7 @@ int client_register(int sockfd, user_t* user) {
 
     prompt(1, "Please enter your username:", 1);
     str_input(user->name, 31, NULL);
-    printf("Please enter your password:");
+    prompt(0, "Please enter your password:", 0);
     str_input(user->password, 31, NULL);
 
     if (send_packet(sockfd, REG, sizeof(user_t), user) == -1) {
@@ -157,7 +157,7 @@ int client_login(int sockfd, user_t* user) {
 //客户端功能函数
 void client_function(int sockfd, packet_t* packet, user_t* user) {
     while (1) {
-        printf("Welcome, %s!\n", user->name);
+        printf("\n\nWelcome, %s!\n", user->name);
         printf("+---------------------------------+\n");
         printf("|     1 Change Password           |\n");
         printf("|     2 Search Word               |\n");

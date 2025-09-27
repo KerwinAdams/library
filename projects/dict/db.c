@@ -120,7 +120,7 @@ int request_newpwd(MYSQL* mysql, packet_t* packet, user_t* user, int sockfd) {
         return ERROR;
     }
     send_packet(sockfd, NEWPWD_SUCCESS, 0, NULL);
-    return CORRECT;
+    return NEWPWD_SUCCESS;
 }
 
 //查询单词

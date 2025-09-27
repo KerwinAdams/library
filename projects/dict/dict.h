@@ -51,11 +51,12 @@ typedef struct {
     char word[32];
 }history_t;
 
+void daemonize();
 void system_run(int argc, char* argv[]);
-void log_init();
 int server_init(char* argv[]);
 void server_loop(int fd);
 void* client_thread(void* arg);
+void signal_handler(int sig);
 
 int db_init(MYSQL* mysql);
 int request_register(MYSQL* mysql, packet_t* packet, user_t* user, int sockfd);
@@ -68,3 +69,4 @@ int request_history(MYSQL* mysql, packet_t* packet, user_t* user, int sockfd);
 
 int log_msg(char* str1, char* str2, char* str3);
 int send_packet(int sockfd, int type, size_t size, void* data);
+void reg_mem(void* ptr);

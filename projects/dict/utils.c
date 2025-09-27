@@ -4,6 +4,8 @@
 #include<stdlib.h>
 #include<fcntl.h>
 #include<time.h>
+#include<stdlib.h>
+#include"dict.h"
 #include"utils.h"
 
 //自定义输入函数
@@ -33,7 +35,6 @@ void str_input(char* str, size_t size, char* prompt) {
 int send_packet(int sockfd, int type, size_t size, void* data) {
     packet_t* p = (packet_t*)malloc(sizeof(packet_t) + size);
     if (p == NULL) {
-        perror("malloc");
         return -1;
     }
     p->type = type;
@@ -41,13 +42,11 @@ int send_packet(int sockfd, int type, size_t size, void* data) {
     if (data == NULL) {
         p->size = 0;
         if (send(sockfd, p, sizeof(packet_t), 0) == -1) {
-            perror("send");
             return -1;
         }
     } else {
         memcpy(p->data, data, size);
         if (send(sockfd, p, sizeof(packet_t) + size, 0) == -1) {
-            perror("send");
             return -1;
         }
     }

@@ -7,17 +7,23 @@
 int db_init(MYSQL* mysql) {
 
     if (mysql_init(mysql) == NULL) {
-        printf("%s\n", mysql_error(mysql));
+        char err[128];
+        sprintf(err, "mysql_init error: %s", mysql_error(mysql));
+        log_msg(err, NULL, NULL);
         return -1;
     }
 
     if (mysql_real_connect(mysql, "localhost", "kerwin", "231925", "dict", 0, NULL, 0) == NULL) {
-        printf("%s\n", mysql_error(mysql));
+        char err[128];
+        sprintf(err, "mysql_init error: %s", mysql_error(mysql));
+        log_msg(err, NULL, NULL);
         return -1;
     }
 
     if (mysql_set_character_set(mysql, "utf8") != 0) {
-        printf("%s\n", mysql_error(mysql));
+        char err[128];
+        sprintf(err, "mysql_init error: %s", mysql_error(mysql));
+        log_msg(err, NULL, NULL);
         return -1;
     }
 
@@ -32,14 +38,18 @@ int request_register(MYSQL* mysql, packet_t* packet, user_t* user, int sockfd) {
     char sql[128];
     sprintf(sql, "SELECT * FROM user WHERE 用户名 = '%s'", user->name);
     if (mysql_query(mysql, sql)) {
-        printf("%s\n", mysql_error(mysql));
+        char err[128];
+        sprintf(err, "mysql_init error: %s", mysql_error(mysql));
+        log_msg(err, NULL, NULL);
         send_packet(sockfd, ERROR, 0, NULL);
         return ERROR;
     }
 
     MYSQL_RES* res = mysql_store_result(mysql);
     if (res == NULL) {
-        printf("%s\n", mysql_error(mysql));
+        char err[128];
+        sprintf(err, "mysql_init error: %s", mysql_error(mysql));
+        log_msg(err, NULL, NULL);
         send_packet(sockfd, ERROR, 0, NULL);
         return ERROR;
     }
@@ -52,7 +62,9 @@ int request_register(MYSQL* mysql, packet_t* packet, user_t* user, int sockfd) {
         memset(sql, 0, 128);
         sprintf(sql, "INSERT INTO user VALUES ('%s', '%s')", user->name, user->password);
         if (mysql_query(mysql, sql)) {
-            printf("%s\n", mysql_error(mysql));
+            char err[128];
+            sprintf(err, "mysql_init error: %s", mysql_error(mysql));
+            log_msg(err, NULL, NULL);
             send_packet(sockfd, ERROR, 0, NULL);
             return ERROR;
         }
@@ -68,14 +80,18 @@ int request_login(MYSQL* mysql, packet_t* packet, user_t* user, int sockfd) {
     char sql[128];
     sprintf(sql, "SELECT * FROM user WHERE 用户名 = '%s' AND 密码 = '%s'", user->name, user->password);
     if (mysql_query(mysql, sql)) {
-        printf("%s\n", mysql_error(mysql));
+        char err[128];
+        sprintf(err, "mysql_init error: %s", mysql_error(mysql));
+        log_msg(err, NULL, NULL);
         send_packet(sockfd, ERROR, 0, NULL);
         return ERROR;
     }
 
     MYSQL_RES* res = mysql_store_result(mysql);
     if (res == NULL) {
-        printf("%s\n", mysql_error(mysql));
+        char err[128];
+        sprintf(err, "mysql_init error: %s", mysql_error(mysql));
+        log_msg(err, NULL, NULL);
         send_packet(sockfd, ERROR, 0, NULL);
         return ERROR;
     }
@@ -97,7 +113,9 @@ int request_newpwd(MYSQL* mysql, packet_t* packet, user_t* user, int sockfd) {
     char sql[128];
     sprintf(sql, "UPDATE user SET 密码 = '%s' WHERE 用户名 = '%s'", user->password, user->name);
     if (mysql_query(mysql, sql)) {
-        printf("%s\n", mysql_error(mysql));
+        char err[128];
+        sprintf(err, "mysql_init error: %s", mysql_error(mysql));
+        log_msg(err, NULL, NULL);
         send_packet(sockfd, ERROR, 0, NULL);
         return ERROR;
     }
@@ -118,14 +136,18 @@ int request_search(MYSQL* mysql, packet_t* packet, int sockfd) {
     char sql[128];
     sprintf(sql, "SELECT * FROM word WHERE 单词 = '%s'", word);
     if (mysql_query(mysql, sql)) {
-        printf("%s\n", mysql_error(mysql));
+        char err[128];
+        sprintf(err, "mysql_init error: %s", mysql_error(mysql));
+        log_msg(err, NULL, NULL);
         send_packet(sockfd, ERROR, 0, NULL);
         return ERROR;
     }
 
     MYSQL_RES* res = mysql_store_result(mysql);
     if (res == NULL) {
-        printf("%s\n", mysql_error(mysql));
+        char err[128];
+        sprintf(err, "mysql_init error: %s", mysql_error(mysql));
+        log_msg(err, NULL, NULL);
         send_packet(sockfd, ERROR, 0, NULL);
         return ERROR;
     }
@@ -134,7 +156,7 @@ int request_search(MYSQL* mysql, packet_t* packet, int sockfd) {
     if (rows == 0) {
         send_packet(sockfd, SEARCH_FAILED, 0, NULL);
         return SEARCH_FAILED;
-    }else {
+    } else {
         MYSQL_ROW row = mysql_fetch_row(res);
         strcpy(meaning, row[1]);
         send_packet(sockfd, SEARCH_SUCCESS, strlen(meaning) + 1, meaning);
@@ -147,7 +169,9 @@ int db_history_add(MYSQL* mysql, history_t history) {
     char sql[256];
     sprintf(sql, "INSERT INTO history VALUES ('%s', '%s', '%s')", history.user, history.time, history.word);
     if (mysql_query(mysql, sql)) {
-        printf("%s\n", mysql_error(mysql));
+        char err[128];
+        sprintf(err, "mysql_init error: %s", mysql_error(mysql));
+        log_msg(err, NULL, NULL);
         return -1;
     }
     return 0;
@@ -159,14 +183,18 @@ int request_history(MYSQL* mysql, packet_t* packet, user_t* user, int sockfd) {
     char sql[128];
     sprintf(sql, "SELECT * FROM history WHERE 用户名 = '%s'", user->name);
     if (mysql_query(mysql, sql)) {
-        printf("%s\n", mysql_error(mysql));
+        char err[128];
+        sprintf(err, "mysql_init error: %s", mysql_error(mysql));
+        log_msg(err, NULL, NULL);
         send_packet(sockfd, ERROR, 0, NULL);
         return ERROR;
     }
 
     MYSQL_RES* res = mysql_store_result(mysql);
     if (res == NULL) {
-        printf("%s\n", mysql_error(mysql));
+        char err[128];
+        sprintf(err, "mysql_init error: %s", mysql_error(mysql));
+        log_msg(err, NULL, NULL);
         send_packet(sockfd, ERROR, 0, NULL);
         return ERROR;
     }
@@ -175,10 +203,10 @@ int request_history(MYSQL* mysql, packet_t* packet, user_t* user, int sockfd) {
     if (rows == 0) {
         send_packet(sockfd, HISTORY_FAILED, 0, NULL);
         return HISTORY_FAILED;
-    }else if(rows > 0){
+    } else if (rows > 0) {
         send_packet(sockfd, HISTORY_SUCCESS, 0, NULL);
-        MYSQL_ROW row; 
-        for(int i = 1; i <= rows; i++){
+        MYSQL_ROW row;
+        for (int i = 1; i <= rows; i++) {
             row = mysql_fetch_row(res);
             history_t history = { 0 };
             strcpy(history.user, row[0]);

@@ -11,11 +11,11 @@ TARGETS = server client
 all: $(TARGETS)
 
 # 生成 server 可执行文件（链接 MySQL 和线程库）
-server: server.o db.o utils.o
-	$(CC) $(CFLAGS) -o server server.o db.o utils.o $(LDFLAGS)
+server: server.o db.o
+	$(CC) $(CFLAGS) -o server server.o db.o  $(LDFLAGS)
 
-# 编译 server.o（依赖 server.c、utils.h、dict.h）
-server.o: server.c utils.h dict.h
+# 编译 server.o（依赖 server.c、dict.h）
+server.o: server.c  dict.h
 	$(CC) $(CFLAGS) -c server.c
 
 # 编译 db.o（依赖 db.c、dict.h）

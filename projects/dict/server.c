@@ -12,9 +12,8 @@
 #include<stdio.h>
 #include<time.h>
 #include"dict.h"
-#include"utils.h"
 
-static int log_fd = -1;
+int log_fd = -1;
 
 void sig_handler(int sig) {
 
@@ -37,12 +36,10 @@ void sig_handler(int sig) {
 
 int main(int argc, char* argv[]) {
     printf("%d\n",getpid());
-    //daemon(0, 0);//将进程变为守护进程
+    //daemon(0, 0);
     system_run(argc, argv);
     return 0;
 }
-
-
 
 //系统运行函数
 void system_run(int argc, char* argv[]) {
@@ -67,9 +64,9 @@ void system_run(int argc, char* argv[]) {
 
 //日志初始化函数
 void log_init() {
-    log_fd = open("log.txt", O_WRONLY | O_APPEND | O_CREAT, 0777);
+    log_fd = open("/temp/dcit_server_log.txt", O_WRONLY | O_APPEND | O_CREAT, 0666);
     if (log_fd == -1) {
-        printf("log init error\n");
+        printf("open log file error\n");
         exit(1);
     }
     return;
@@ -269,4 +266,27 @@ cleanup:
     close(client.sockfd);
     free(arg);
     return NULL;
+}
+
+//数据包发送函数
+int send_packet(int sockfd, int type, size_t size, void* data) {
+    packet_t* p = (packet_t*)malloc(sizeof(packet_t) + size);
+    if (p == NULL) {
+        return -1;
+    }
+    p->type = type;
+    p->size = size;
+    if (data == NULL) {
+        p->size = 0;
+        if (send(sockfd, p, sizeof(packet_t), 0) == -1) {
+            return -1;
+        }
+    } else {
+        memcpy(p->data, data, size);
+        if (send(sockfd, p, sizeof(packet_t) + size, 0) == -1) {
+            return -1;
+        }
+    }
+    free(p);
+    return 0;
 }

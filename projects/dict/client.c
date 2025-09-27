@@ -22,6 +22,18 @@ int main(int argc, char* argv[]) {
         return -1;
     }
 
+    packet_t client_start;
+    recv(sockfd, &client_start, sizeof(packet_t), 0);
+    if(client_start.type == ERROR){
+        printf("Server error, please try again later!\n");
+        return -1;
+    }
+    recv(sockfd, &client_start, sizeof(packet_t), 0);
+    if(client_start.type == ERROR){
+        printf("Database init error, please try again later!\n");
+        return -1;
+    }
+
     while (1) {
 
         printf("+----------------------+\n");
@@ -177,7 +189,7 @@ void client_function(int sockfd, packet_t* packet, user_t* user) {
 
             prompt(1, "Please enter the word you want to search: ", 1);
             char word[128] = { 0 };
-            str_input(word, 32, NULL);
+            str_input(word, 31, NULL);
 
             history_t history = { 0 };
             strcpy(history.user, user->name);
@@ -226,7 +238,7 @@ void client_function(int sockfd, packet_t* packet, user_t* user) {
                         break;
                     }
                     recv(sockfd, &history, packet->size, 0);
-                    printf("|  %s  |  %s\t\t\t\t|\n", history.time, history.word);
+                    printf("|  %s  |  %-32s|\n", history.time, history.word);
                 }
             } else if (packet->type == HISTORY_FAILED) {
                 prompt(1, "History not found!", 3);

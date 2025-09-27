@@ -6,26 +6,12 @@
 #include<time.h>
 #include"utils.h"
 
-//服务器端日志记录函数
-int log_msg(char* str) {
-    time_t now;
-    now = time(NULL);
-    char* time_str = asctime(localtime(&now));
-    time_str[strlen(time_str) - 1] = '\0';
-    char log_str[1024];
-    sprintf(log_str, "%s %s\n", time_str, str);
-    int fd = open("log.txt", O_WRONLY | O_APPEND | O_CREAT, 0777);
-    write(fd, log_str, strlen(log_str));
-    close(fd);
-    return 0;
-}
-
 //自定义输入函数
 void str_input(char* str, size_t size, char* prompt) {
 
     while (1) {
         str[0] = '\0';
-        fgets(str, sizeof(str), stdin);
+        fgets(str, 1024, stdin);
         str[strcspn(str, "\n")] = 0;
 
         if (strlen(str) == 0 || strlen(str) > size) {

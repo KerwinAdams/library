@@ -1,46 +1,102 @@
+#include<sys/resource.h>
 #include<sys/socket.h>
 #include<netinet/in.h>
 #include<arpa/inet.h>
 #include<sys/types.h>
 #include<pthread.h>
+#include<signal.h>
 #include<stdlib.h>
 #include<unistd.h>
 #include<string.h>
+#include<fcntl.h>
 #include<stdio.h>
 #include<time.h>
 #include"dict.h"
 #include"utils.h"
 
+static int log_fd = -1;
+
+void sig_handler(int sig) {
+
+    struct rlimit rlim;
+    int max_fd;
+    int fd;
+
+    if (getrlimit(RLIMIT_NOFILE, &rlim) == -1) {
+        max_fd = 1024;
+    }else{
+        max_fd = rlim.rlim_max;
+    }
+
+    for(fd = 3; fd < max_fd; fd++){
+        close(fd);
+    }
+
+    exit(0);
+}
+
 int main(int argc, char* argv[]) {
+    printf("%d\n",getpid());
+    //daemon(0, 0);//将进程变为守护进程
     system_run(argc, argv);
     return 0;
 }
 
 
+
 //系统运行函数
 void system_run(int argc, char* argv[]) {
 
-    prompt(1, NULL, 0);
+    signal(SIGINT, sig_handler);
 
     if (argc != 2) {
-        printf("usage: %s <port>\n", argv[0]);
         return;
     }
 
     int sockfd = server_init(argv);
     if (sockfd == -1) {
-        log_msg("server init error");
+        log_msg("server init error", NULL, NULL);
         return;
     }
 
-    log_msg("server start");
+    log_msg("server start", NULL, NULL);
 
     server_loop(sockfd);
     return;
 }
 
+//日志初始化函数
+void log_init() {
+    log_fd = open("log.txt", O_WRONLY | O_APPEND | O_CREAT, 0777);
+    if (log_fd == -1) {
+        printf("log init error\n");
+        exit(1);
+    }
+    return;
+}
+
+//服务器端日志记录函数
+int log_msg(char* str1, char* str2, char* str3) {
+    time_t now;
+    now = time(NULL);
+    char* time_str = asctime(localtime(&now));
+    time_str[strlen(time_str) - 1] = '\0';
+    char log_str[1024];
+    if (str2 == NULL) {
+        sprintf(log_str, "%s %s\n", time_str, str1);
+    } else if (str3 == NULL) {
+        sprintf(log_str, "%s %s %s\n", time_str, str1, str2);
+    } else {
+        sprintf(log_str, "%s %s %s %s\n", time_str, str1, str2, str3);
+    }
+    write(log_fd, log_str, strlen(log_str));
+    return 0;
+}
+
 //服务器初始化函数
 int server_init(char* argv[]) {
+
+    log_init();
 
     int sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (sockfd < 0) {
@@ -79,9 +135,9 @@ void server_loop(int fd) {
             continue;
         }
 
-        char log_str[128] = { 0 };
-        sprintf(log_str, "client %s:%d connected", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
-        log_msg(log_str);
+        char client_info[128] = { 0 };
+        sprintf(client_info, "client %s:%d", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
+        log_msg(client_info, "connected", NULL);
 
         client_t* temp = (client_t*)malloc(sizeof(client_t));
         temp->sockfd = sockfd;
@@ -89,12 +145,20 @@ void server_loop(int fd) {
 
         pthread_t tid;
         if (pthread_create(&tid, NULL, client_thread, temp) != 0) {
+            close(sockfd);
+            free(temp);
+            send_packet(sockfd, ERROR, 0, NULL);
             continue;
         }
 
         if (pthread_detach(tid) != 0) {
+            close(sockfd);
+            free(temp);
+            send_packet(sockfd, ERROR, 0, NULL);
             continue;
         }
+
+        send_packet(sockfd, CORRECT, 0, NULL);
     }
 }
 
@@ -103,22 +167,18 @@ void* client_thread(void* arg) {
 
     client_t client = *(client_t*)arg;
 
-    char log_str[256] = { 0 };
     char client_info[128] = { 0 };
     sprintf(client_info, "client %s:%d", inet_ntoa(client.addr.sin_addr), ntohs(client.addr.sin_port));
 
-
     MYSQL mysql;
     if (db_init(&mysql) == -1) {
-        sprintf(log_str, "%s database init error", client_info);
-        log_msg(log_str);
-        close(client.sockfd);
-        free(arg);
-        return NULL;
+        log_msg(client_info, "database init error", NULL);
+        send_packet(client.sockfd, ERROR, 0, NULL);
+        goto cleanup;
     }
 
-    sprintf(log_str, "%s database init success", client_info);
-    log_msg(log_str);
+    log_msg(client_info, "database init success", NULL);
+    send_packet(client.sockfd, CORRECT, 0, NULL);
 
     packet_t packet;
     user_t user;
@@ -131,78 +191,80 @@ void* client_thread(void* arg) {
 
         if (packet.type == REG) {
 
-            sprintf(log_str, "%s request register", client_info);
-            log_msg(log_str);
+            log_msg(client_info, "request register", NULL);
 
             int ret = request_register(&mysql, &packet, &user, client.sockfd);
-            if (ret == REG_SUCCESS) {
-                sprintf(log_str, "%s register success", client_info);
-            } else if (ret == REG_FAILED) {
-                sprintf(log_str, "%s register failed", client_info);
-            } else {
-                sprintf(log_str, "%s register error", client_info);
+            switch (ret) {
+            case REG_SUCCESS:
+                log_msg(client_info, "register success", NULL);
+                break;
+            case REG_FAILED:
+                log_msg(client_info, "register failed", NULL);
+                break;
+            default:
+                log_msg(client_info, "register error", NULL);
+                break;
             }
-            log_msg(log_str);
 
         } else if (packet.type == LOGIN) {
 
-            sprintf(log_str, "%s request login", client_info);
-            log_msg(log_str);
-
+            log_msg(client_info, "request login", NULL);
             int ret = request_login(&mysql, &packet, &user, client.sockfd);
-            if (ret == LOGIN_SUCCESS) {
-                sprintf(log_str, "%s login success", client_info);
-            } else if (ret == LOGIN_FAILED) {
-                sprintf(log_str, "%s login failed", client_info);
-            } else {
-                sprintf(log_str, "%s login error", client_info);
+            switch (ret) {
+            case LOGIN_SUCCESS:
+                log_msg(client_info, "login success", NULL);
+                break;
+            case LOGIN_FAILED:
+                log_msg(client_info, "log_msgin failed", NULL);
+                break;
+            default:
+                log_msg(client_info, "log_msgin error", NULL);
+                break;
             }
-            log_msg(log_str);
 
         } else if (packet.type == NEWPWD) {
-            sprintf(log_str, "%s %s request newpwd", client_info, user.name);
-            log_msg(log_str);
+
+            log_msg(client_info, "request newpwd", NULL);
             int ret = request_newpwd(&mysql, &packet, &user, client.sockfd);
-            if(ret == CORRECT){
-                sprintf(log_str, "%s %s newpwd success", client_info, user.name);
-            }else{
-                sprintf(log_str, "%s %s newpwd error", client_info, user.name);
+            switch (ret) {
+            case CORRECT:
+                log_msg(client_info, "newpwd success", NULL);
+                break;
+            default:
+                log_msg(client_info, "newpwd error", NULL);
+                break;
             }
-            log_msg(log_str);
 
         } else if (packet.type == SEARCH) {
-            sprintf(log_str, "%s %s request search", client_info, user.name);
-            log_msg(log_str);
+
+            log_msg(client_info, user.name, "request search");
             int ret = request_search(&mysql, &packet, client.sockfd);
-            if(ret == SEARCH_SUCCESS){
-                sprintf(log_str, "%s %s search success", client_info, user.name);
-            }else if(ret == SEARCH_FAILED){
-                sprintf(log_str, "%s %s search failed", client_info, user.name);
-            }else{
-                sprintf(log_str, "%s %s search error", client_info, user.name);
+            if (ret == SEARCH_SUCCESS) {
+                log_msg(client_info, user.name, "search success");
+            } else if (ret == SEARCH_FAILED) {
+                log_msg(client_info, user.name, "search failed");
+            } else {
+                log_msg(client_info, user.name, "search error");
             }
-            log_msg(log_str);
 
         } else if (packet.type == HISTORY) {
-            sprintf(log_str, "%s %s request history", client_info, user.name);
-            log_msg(log_str);
+
+            log_msg(client_info, user.name, "request history");
             int ret = request_history(&mysql, &packet, &user, client.sockfd);
-            if(ret == HISTORY_SUCCESS){
-                sprintf(log_str, "%s %s history success", client_info, user.name);
-            }else if(ret == HISTORY_FAILED){
-                sprintf(log_str, "%s %s history failed", client_info, user.name);
-            }else{
-                sprintf(log_str, "%s %s history error", client_info, user.name);
+            if (ret == HISTORY_SUCCESS) {
+                log_msg(client_info, user.name, "history success");
+            } else if (ret == HISTORY_FAILED) {
+                log_msg(client_info, user.name, "history failed");
+            } else {
+                log_msg(client_info, user.name, "history error");
             }
-            log_msg(log_str);
 
         } else if (packet.type == QUIT) {
-            sprintf(log_str, "%s %s quit", client_info, user.name);
-            log_msg(log_str);
+            log_msg(client_info, user.name, "quit");
         }
     }
-    sprintf(log_str, "client %s:%d disconnected", inet_ntoa(client.addr.sin_addr), ntohs(client.addr.sin_port));
-    log_msg(log_str);
+    log_msg(client_info, "disconnected", NULL);
+cleanup:
     mysql_close(&mysql);
     close(client.sockfd);
     free(arg);

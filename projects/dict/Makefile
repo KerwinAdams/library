@@ -1,6 +1,6 @@
 # 编译器与编译选项
 CC = gcc
-CFLAGS = -Wall -g  # -Wall 显示所有警告，-g 生成调试信息
+CFLAGS = -Wall  -g   # -Wall 显示所有警告，-g 生成调试信息
 LDFLAGS = -lmysqlclient -pthread  # 同时链接 MySQL 客户端库和线程库（推荐用 -pthread）
 
 # 要生成的可执行文件

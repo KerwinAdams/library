@@ -29,8 +29,9 @@ typedef enum {
     QUIT,
 }code_t;
 
-void system_run(int argc, char* argv[]);
 
+void system_run(int argc, char* argv[]);
+void log_init();
 int server_init(char* argv[]);
 void server_loop(int fd);
 void* client_thread(void* arg);

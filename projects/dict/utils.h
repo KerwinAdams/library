@@ -23,7 +23,7 @@ typedef struct {
     char word[32];
 }history_t;
 
-int log_msg(char* str);
+int log_msg(char* str1, char* str2, char* str3);
 void str_input(char* str, size_t size, char* prompt);
 int send_packet(int sockfd, int type, size_t size, void* data);
 void prompt(int clear, char* str, int line);

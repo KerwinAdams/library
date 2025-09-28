@@ -309,6 +309,7 @@ void signal_handler(int sig) {
     exit(0);
 }
 
+//信号处理函数设置
 void setup_signal() {
     struct sigaction sa;
     sa.sa_handler = signal_handler;

@@ -12,7 +12,9 @@ int client_init(int argc, char* argv[]);
 int client_register(int sockfd, user_t* user);
 int client_login(int sockfd, user_t* user);
 void client_function(int sockfd, packet_t* packet, user_t* user);
-
+void client_func_newpwd(int sockfd, packet_t* packet, user_t* user);
+void client_func_search(int sockfd, packet_t* packet, user_t* user);
+void client_func_history(int sockfd, packet_t* packet, user_t* user);
 
 int main(int argc, char* argv[]) {
 
@@ -170,85 +172,21 @@ void client_function(int sockfd, packet_t* packet, user_t* user) {
 
         if (strcmp(buf, "1") == 0) {
 
-            prompt(1, "Please enter your new password: ", 1);
-            str_input(user->password, 31, NULL);
-
-            if (-1 == send_packet(sockfd, NEWPWD, sizeof(user_t), user)) {
-                prompt(1, "Send packet error, please try again later!", 3);
-                continue;
-            }
-
-            recv(sockfd, packet, sizeof(packet_t), 0);
-            if (packet->type == NEWPWD_SUCCESS) {
-                prompt(1, "Change password success!", 3);
-            } else if (packet->type == ERROR) {
-                prompt(1, "Error!", 3);
-            }
+            client_func_newpwd(sockfd, packet, user);
 
         } else if (strcmp(buf, "2") == 0) {
 
-            prompt(1, "Please enter the word you want to search: ", 1);
-            char word[128] = { 0 };
-            str_input(word, 31, NULL);
+            client_func_search(sockfd, packet, user);
 
-            history_t history = { 0 };
-            strcpy(history.user, user->name);
-            time_t now = time(NULL);
-            char* time_str = asctime(localtime(&now));
-            time_str[strlen(time_str) - 1] = '\0';
-            strcpy(history.time, time_str);
-            strcpy(history.word, word);
-
-            if (-1 == send_packet(sockfd, SEARCH, sizeof(history_t), &history)) {
-                prompt(1, "Send packet error, please try again later!", 3);
-                continue;
-            }
-
-            char meaning[256] = { 0 };
-            recv(sockfd, packet, sizeof(packet_t), 0);
-            if (packet->type == SEARCH_SUCCESS) {
-                recv(sockfd, meaning, packet->size, 0);
-                prompt(1, word, 1);
-                prompt(0, meaning, 2);
-            } else if (packet->type == SEARCH_FAILED) {
-                prompt(1, "Word not found!", 3);
-            } else if (packet->type == ERROR) {
-                prompt(1, "Error!", 3);
-            }
         } else if (strcmp(buf, "3") == 0) {
 
-            if (-1 == send_packet(sockfd, HISTORY, 0, NULL)) {
-                prompt(1, "Send packet error, please try again later!", 3);
-                continue;
-            }
-
-            recv(sockfd, packet, sizeof(packet_t), 0);
-
-            if (packet->type == HISTORY_SUCCESS) {
-                prompt(1, NULL, 1);
-                printf("+---------------------------------------------------------------+\n");
-                printf("|  Time                      |  Word\t\t\t\t|\n");
-                printf("|----------------------------|----------------------------------|\n");
-                while (1) {
-                    history_t history = { 0 };
-                    recv(sockfd, packet, sizeof(packet_t), 0);
-                    if (packet->type == HISTORY_TRANS_FINISHED) {
-                        printf("+---------------------------------------------------------------+\n");
-                        prompt(0, "Retrieve finish!", 2);
-                        break;
-                    }
-                    recv(sockfd, &history, packet->size, 0);
-                    printf("|  %s  |  %-32s|\n", history.time, history.word);
-                }
-            } else if (packet->type == HISTORY_FAILED) {
-                prompt(1, "History not found!", 3);
-            } else if (packet->type == ERROR) {
-                prompt(1, "Error!", 3);
-            }
+            client_func_history(sockfd, packet, user);
 
         } else if (strcmp(buf, "4") == 0) {
             prompt(1, NULL, 0);
-            send_packet(sockfd, QUIT, 0, NULL);
+            if(-1 == send_packet(sockfd, QUIT, 0, NULL)){
+                prompt(1, "Send packet error, please try again later!", 3);
+            }
             break;
         } else {
             prompt(1, "Invalid input", 3);
@@ -257,3 +195,87 @@ void client_function(int sockfd, packet_t* packet, user_t* user) {
     return;
 }
 
+//客户端修改密码函数
+void client_func_newpwd(int sockfd, packet_t* packet, user_t* user) {
+    prompt(1, "Please enter your new password: ", 1);
+    str_input(user->password, 31, NULL);
+
+    if (-1 == send_packet(sockfd, NEWPWD, sizeof(user_t), user)) {
+        prompt(1, "Send packet error, please try again later!", 3);
+        return;
+    }
+
+    recv(sockfd, packet, sizeof(packet_t), 0);
+    if (packet->type == NEWPWD_SUCCESS) {
+        prompt(1, "Change password success!", 3);
+    } else if (packet->type == ERROR) {
+        prompt(1, "Error!", 3);
+    }
+    return;
+}
+
+//客户端搜索词函数
+void client_func_search(int sockfd, packet_t* packet, user_t* user) {
+    prompt(1, "Please enter the word you want to search: ", 1);
+    char word[128] = { 0 };
+    str_input(word, 31, NULL);
+
+    history_t history = { 0 };
+    strcpy(history.user, user->name);
+    time_t now = time(NULL);
+    char* time_str = asctime(localtime(&now));
+    time_str[strlen(time_str) - 1] = '\0';
+    strcpy(history.time, time_str);
+    strcpy(history.word, word);
+
+    if (-1 == send_packet(sockfd, SEARCH, sizeof(history_t), &history)) {
+        prompt(1, "Send packet error, please try again later!", 3);
+        return;
+    }
+
+    char meaning[256] = { 0 };
+    recv(sockfd, packet, sizeof(packet_t), 0);
+    if (packet->type == SEARCH_SUCCESS) {
+        recv(sockfd, meaning, packet->size, 0);
+        prompt(1, word, 1);
+        prompt(0, meaning, 2);
+    } else if (packet->type == SEARCH_FAILED) {
+        prompt(1, "Word not found!", 3);
+    } else if (packet->type == ERROR) {
+        prompt(1, "Error!", 3);
+    }
+    return;
+}
+
+//客户端历史查询函数
+void client_func_history(int sockfd, packet_t* packet, user_t* user) {
+    if (-1 == send_packet(sockfd, HISTORY, 0, NULL)) {
+        prompt(1, "Send packet error, please try again later!", 3);
+        return;
+    }
+
+    recv(sockfd, packet, sizeof(packet_t), 0);
+
+    if (packet->type == HISTORY_SUCCESS) {
+        prompt(1, NULL, 1);
+        printf("+---------------------------------------------------------------+\n");
+        printf("|  Time                      |  Word                            |\n");
+        printf("|----------------------------|----------------------------------|\n");
+        while (1) {
+            history_t history = { 0 };
+            recv(sockfd, packet, sizeof(packet_t), 0);
+            if (packet->type == HISTORY_TRANS_FINISHED) {
+                printf("+---------------------------------------------------------------+\n");
+                prompt(0, "Retrieve finish!", 2);
+                break;
+            }
+            recv(sockfd, &history, packet->size, 0);
+            printf("|  %s  |  %-32s|\n", history.time, history.word);
+        }
+    } else if (packet->type == HISTORY_FAILED) {
+        prompt(1, "History not found!", 3);
+    } else if (packet->type == ERROR) {
+        prompt(1, "Error!", 3);
+    }
+    return;
+}

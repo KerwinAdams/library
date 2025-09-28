@@ -13,14 +13,12 @@
 #include<time.h>
 #include"dict.h"
 
-
-void* allocated_mem[1024] = { 0 };
+void* allocated_mem[1024] = { NULL };
 int mem_count = 0;
 
 int main(int argc, char* argv[]) {
-
-    signal(SIGINT, signal_handler);
     daemonize();
+    setup_signal();
     system_run(argc, argv);
     return 0;
 }
@@ -50,9 +48,9 @@ void system_run(int argc, char* argv[]) {
     if (sockfd == -1) {
         log_msg("server init error", NULL, NULL);
         return;
+    } else {
+        log_msg("server init success", NULL, NULL);
     }
-
-    log_msg("server start", NULL, NULL);
 
     server_loop(sockfd);
     return;
@@ -61,7 +59,6 @@ void system_run(int argc, char* argv[]) {
 
 //服务器初始化函数
 int server_init(char* argv[]) {
-
 
     int sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (sockfd < 0) {
@@ -141,23 +138,21 @@ void* client_thread(void* arg) {
     char client_info[128] = { 0 };
     sprintf(client_info, "client %s:%d", inet_ntoa(client.addr.sin_addr), ntohs(client.addr.sin_port));
 
-    //初始化数据库连接
     MYSQL mysql;
     if (db_init(&mysql) == -1) {
         log_msg(client_info, "database init error", NULL);
         send_packet(client.sockfd, ERROR, 0, NULL);
         goto cleanup;
-    } else {
-        log_msg(client_info, "database init success", NULL);
-        send_packet(client.sockfd, CORRECT, 0, NULL);
     }
 
+    log_msg(client_info, "database init success", NULL);
+    send_packet(client.sockfd, CORRECT, 0, NULL);
 
     packet_t packet;
     user_t user;
+
     while (1) {
         memset(&packet, 0, sizeof(packet_t));
-        //接收数据包
         if (recv(client.sockfd, &packet, sizeof(packet_t), 0) == 0) {
             break;
         }
@@ -232,25 +227,19 @@ void* client_thread(void* arg) {
     }
     log_msg(client_info, "disconnected", NULL);
 cleanup:
-    //关闭数据库连接
     mysql_close(&mysql);
-    //关闭套接字
     close(client.sockfd);
-    //释放内存
     free(arg);
     return NULL;
 }
 
-//数据包打包函数
+//数据包发送函数
 int send_packet(int sockfd, int type, size_t size, void* data) {
-    //申请内存
     packet_t* p = (packet_t*)malloc(sizeof(packet_t) + size);
     if (p == NULL) {
         return -1;
     }
-    //注册内存
     reg_mem(p);
-    //填充数据
     p->type = type;
     p->size = size;
     if (data == NULL) {
@@ -270,11 +259,10 @@ int send_packet(int sockfd, int type, size_t size, void* data) {
 
 //服务器端日志记录函数
 int log_msg(char* str1, char* str2, char* str3) {
-    //获取当前时间
     time_t now;
     now = time(NULL);
     char* time_str = asctime(localtime(&now));
-    //打印日志
+    time_str[strlen(time_str) - 1] = '\0';
     if (str2 == NULL) {
         printf("%s %s\n", time_str, str1);
     } else if (str3 == NULL) {
@@ -282,10 +270,10 @@ int log_msg(char* str1, char* str2, char* str3) {
     } else {
         printf("%s %s %s %s\n", time_str, str1, str2, str3);
     }
+    fflush(stdout);
     return 0;
 }
 
-//注册内存函数
 void reg_mem(void* ptr) {
     if (mem_count < 1024) {
         allocated_mem[mem_count++] = ptr;
@@ -293,8 +281,10 @@ void reg_mem(void* ptr) {
     return;
 }
 
-//信号处理函数
+//退出信号处理函数
 void signal_handler(int sig) {
+
+    log_msg("server exit", NULL, NULL);
 
     struct rlimit rl;
     getrlimit(RLIMIT_NOFILE, &rl);
@@ -317,4 +307,13 @@ void signal_handler(int sig) {
     mem_count = 0;
     //退出程序
     exit(0);
+}
+
+void setup_signal() {
+    struct sigaction sa;
+    sa.sa_handler = signal_handler;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = 0;
+    sigaction(SIGINT, &sa, NULL);
+    return;
 }

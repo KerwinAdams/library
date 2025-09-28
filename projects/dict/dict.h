@@ -57,6 +57,7 @@ int server_init(char* argv[]);
 void server_loop(int fd);
 void* client_thread(void* arg);
 void signal_handler(int sig);
+void setup_signal();
 
 int db_init(MYSQL* mysql);
 int request_register(MYSQL* mysql, packet_t* packet, user_t* user, int sockfd);

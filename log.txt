@@ -1,37 +1,25 @@
-Sun Sep 28 08:42:48 2025 server start
-Sun Sep 28 08:43:25 2025 client 127.0.0.1:54012 connected
-Sun Sep 28 08:43:26 2025 client 127.0.0.1:54012 database init success
-Sun Sep 28 08:44:06 2025 client 127.0.0.1:54012 request login
-Sun Sep 28 08:44:06 2025 client 127.0.0.1:54012 login success
-Sun Sep 28 08:44:12 2025 client 127.0.0.1:54012 request newpwd
-Sun Sep 28 08:44:12 2025 client 127.0.0.1:54012 newpwd success
-Sun Sep 28 08:44:16 2025 client 127.0.0.1:54012 kerwin quit
-Sun Sep 28 08:44:20 2025 client 127.0.0.1:54012 request login
-Sun Sep 28 08:44:20 2025 client 127.0.0.1:54012 login success
-Sun Sep 28 08:44:29 2025 client 127.0.0.1:54012 kerwin request search
-Sun Sep 28 08:44:29 2025 client 127.0.0.1:54012 kerwin searuccess
-Sun Sep 28 08:45:02 2025 client 127.0.0.1:54012 kerwin request search
-Sun Sep 28 08:45:02 2025 client 127.0.0.1:54012 kerwin search failed
-Sun Sep 28 08:45:07 2025 client 127.0.0.1:54012 kerwin request history
-Sun Sep 28 08:45:07 2025 client 127.0.0.1:54012 kerwin history success
-Sun Sep 28 08:45:29 2025 client 127.0.0.1:54012 kerwin quit
-Sun Sep 28 08:45:44 2025 client 127.0.0.1:54012 request login
-Sun Sep 28 08:45:44 2025 client 127.0.0.1:54012 login success
-Sun Sep 28 08:45:48 2025 client 127.0.0.1:54012 peter request history
-Sun Sep 28 08:45:48 2025 client 127.0.0.1:54012 peter history success
-Sun Sep 28 08:45:54 2025 client 127.0.0.1:54012 peter quit
-Sun Sep 28 08:46:10 2025 client 127.0.0.1:54012 disconnected
-Sun Sep 28 08:46:32 2025 client 127.0.0.1:37172 connected
-Sun Sep 28 08:46:32 2025 client 127.0.0.1:37172 database init success
-Sun Sep 28 08:46:35 2025 client 127.0.0.1:37182 connected
-Sun Sep 28 08:46:35 2025 client 127.0.0.1:37182 da
-Sun Sep 28 08:46:47 2025 client 127.0.0.1:37172 disconnected
-Sun Sep 28 08:46:48 2025 client 127.0.0.1:37182 disconnected
-Sun Sep 28 08:56:04 2025 server init success
-Sun Sep 28 09:05:05 2025 server init success
-Sun Sep 28 09:05:51 2025 server init success
-Sun Sep 28 09:05:53 2025 client 127.0.0.1:42794 connected
-Sun Sep 28 09:05:53 2025 client 127.0.0.1:42794 database init success
-Sun Sep 28 09:06:17 2025 client 127.0.0.1:42794 disconnected
-Sun Sep 28 09:06:20 2025 server init error
-Sun Sep 28 09:07:11 2025 server init success
+Sun Sep 28 14:18:24 2025 server init error
+Sun Sep 28 14:56:47 2025 server init success
+Sun Sep 28 14:56:58 2025 client 127.0.0.1:43104 connected
+Sun Sep 28 14:56:58 2025 client 127.0.0.1:43104 database init success
+Sun Sep 28 14:57:18 2025 client 127.0.0.1:43104 request register
+Sun Sep 28 14:57:18 2025 client 127.0.0.1:43104 register success
+Sun Sep 28 14:57:46 2025 client 127.0.0.1:43104 kerwin quit
+Sun Sep 28 14:57:47 2025 client 127.0.0.1:43104 disconnected
+Sun Sep 28 14:58:11 2025 server exit
+Sun Sep 28 14:59:35 2025 server init success
+Sun Sep 28 15:41:08 2025 server init success
+Sun Sep 28 15:41:28 2025 client 127.0.0.1:48062 connected
+Sun Sep 28 15:41:28 2025 client 127.0.0.1:48062 database init success
+Sun Sep 28 15:41:47 2025 client 127.0.0.1:48062 request login
+Sun Sep 28 15:41:47 2025 client 127.0.0.1:48062 login success
+Sun Sep 28 15:41:59 2025 client 127.0.0.1:48062 request newpwd
+Sun Sep 28 15:41:59 2025 client 127.0.0.1:48062 newpwd success
+Sun Sep 28 15:42:05 2025 client 127.0.0.1:48062 kerwin request history
+Sun Sep 28 15:42:05 2025 client 127.0.0.1:48062 kerwin history success
+Sun Sep 28 15:42:19 2025 client 127.0.0.1:48062 kerwin request search
+Sun Sep 28 15:42:19 2025 client 127.0.0.1:48062 kerwin search failed
+Sun Sep 28 15:42:34 2025 client 127.0.0.1:48062 kerwin quit
+Sun Sep 28 15:42:44 2025 client 127.0.0.1:48062 request register
+Sun Sep 28 15:42:44 2025 client 127.0.0.1:48062 register failed
+Sun Sep 28 15:43:09 2025 client 127.0.0.1:48062 disconnected

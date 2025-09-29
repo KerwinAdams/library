@@ -4,28 +4,15 @@
 
 typedef enum {
     ERROR = -1,
-    CORRECT,
+    FAILED,
+    SUCCESS,
 
     REG,
-    REG_SUCCESS,
-    REG_FAILED,
-
     LOGIN,
-    LOGIN_SUCCESS,
-    LOGIN_FAILED,
-
     NEWPWD,
-    NEWPWD_SUCCESS,
-
     SEARCH,
-    SEARCH_SUCCESS,
-    SEARCH_FAILED,
-
     HISTORY,
-    HISTORY_SUCCESS,
     HISTORY_TRANS_FINISHED,
-    HISTORY_FAILED,
-
     QUIT,
 }code_t;
 
@@ -51,6 +38,7 @@ typedef struct {
     char word[32];
 }history_t;
 
+//server 函数
 void daemonize();
 void system_run(int argc, char* argv[]);
 int server_init(char* argv[]);
@@ -59,6 +47,7 @@ void* client_thread(void* arg);
 void signal_handler(int sig);
 void setup_signal();
 
+//db 函数
 int db_init(MYSQL* mysql);
 int request_register(MYSQL* mysql, packet_t* packet, user_t* user, int sockfd);
 int request_login(MYSQL* mysql, packet_t* packet, user_t* user, int sockfd);
@@ -67,7 +56,7 @@ int request_search(MYSQL* mysql, packet_t* packet, int sockfd);
 int db_history_add(MYSQL* mysql, history_t history);
 int request_history(MYSQL* mysql, packet_t* packet, user_t* user, int sockfd);
 
-
-int log_msg(char* str1, char* str2, char* str3);
+//support 函数
+int log_msg(const char* str1, const char* str2, const char* str3);
 int send_packet(int sockfd, int type, size_t size, void* data);
 void reg_mem(void* ptr);

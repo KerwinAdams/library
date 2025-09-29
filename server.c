@@ -8,10 +8,13 @@
 #include<unistd.h>
 #include<string.h>
 #include<signal.h>
+#include<errno.h>
 #include<fcntl.h>
 #include<stdio.h>
 #include<time.h>
 #include"dict.h"
+
+#define SERVER_PORT 8888
 
 void* allocated_mem[1024] = { NULL };
 int mem_count = 0;
@@ -37,31 +40,35 @@ void daemonize() {
     return;
 }
 
+//信号处理函数设置
+void setup_signal() {
+    struct sigaction sa;
+    sa.sa_handler = signal_handler;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = 0;
+    sigaction(SIGUSR1, &sa, NULL);
+    return;
+}
+
 //系统运行函数
 void system_run(int argc, char* argv[]) {
 
-    if (argc != 2) {
-        return;
-    }
-
     int sockfd = server_init(argv);
     if (sockfd == -1) {
-        log_msg("server init error", NULL, NULL);
         return;
-    } else {
-        log_msg("server init success", NULL, NULL);
     }
 
     server_loop(sockfd);
     return;
 }
 
-
 //服务器初始化函数
 int server_init(char* argv[]) {
 
+    //
     int sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (sockfd < 0) {
+        log_msg("server init failed", strerror(errno), NULL);
         return -1;
     }
 
@@ -70,17 +77,21 @@ int server_init(char* argv[]) {
 
     struct sockaddr_in server_addr;
     server_addr.sin_family = AF_INET;
-    server_addr.sin_port = htons(atoi(argv[1]));
+    server_addr.sin_port = htons(SERVER_PORT);
     server_addr.sin_addr.s_addr = htonl(INADDR_ANY);
     socklen_t addrlen = sizeof(server_addr);
 
     if (bind(sockfd, (struct sockaddr*)&server_addr, addrlen) < 0) {
+        log_msg("server init failed", strerror(errno), NULL);
         return -1;
     }
 
     if (listen(sockfd, 5) < 0) {
+        log_msg("server init failed", strerror(errno), NULL);
         return -1;
     }
+
+    log_msg("server init success", NULL, NULL);
 
     return sockfd;
 }
@@ -94,6 +105,7 @@ void server_loop(int fd) {
     while (1) {
         int sockfd = accept(fd, (struct sockaddr*)&client_addr, &addrlen);
         if (sockfd < 0) {
+            log_msg(strerror(errno), NULL, NULL);
             continue;
         }
 
@@ -104,9 +116,11 @@ void server_loop(int fd) {
         client_t* temp = (client_t*)malloc(sizeof(client_t));
         if (temp == NULL) {
             close(sockfd);
+            log_msg("server loop error", "malloc", strerror(errno));
             send_packet(sockfd, ERROR, 0, NULL);
             continue;
         }
+
         reg_mem(temp);
         temp->sockfd = sockfd;
         temp->addr = client_addr;
@@ -115,6 +129,7 @@ void server_loop(int fd) {
         if (pthread_create(&tid, NULL, client_thread, temp) != 0) {
             close(sockfd);
             free(temp);
+            log_msg("server loop error", "pthread_create", strerror(errno));
             send_packet(sockfd, ERROR, 0, NULL);
             continue;
         }
@@ -122,12 +137,14 @@ void server_loop(int fd) {
         if (pthread_detach(tid) != 0) {
             close(sockfd);
             free(temp);
+            log_msg("server loop error", "pthread_detach", strerror(errno));
             send_packet(sockfd, ERROR, 0, NULL);
             continue;
         }
 
-        send_packet(sockfd, CORRECT, 0, NULL);
+        send_packet(sockfd, SUCCESS, 0, NULL);
     }
+    return;
 }
 
 //客户端线程函数
@@ -140,18 +157,14 @@ void* client_thread(void* arg) {
 
     MYSQL mysql;
     if (db_init(&mysql) == -1) {
-        log_msg(client_info, "database init error", NULL);
-        send_packet(client.sockfd, ERROR, 0, NULL);
         goto cleanup;
     }
-
-    log_msg(client_info, "database init success", NULL);
-    send_packet(client.sockfd, CORRECT, 0, NULL);
 
     packet_t packet;
     user_t user;
 
     while (1) {
+
         memset(&packet, 0, sizeof(packet_t));
         if (recv(client.sockfd, &packet, sizeof(packet_t), 0) == 0) {
             break;
@@ -160,11 +173,10 @@ void* client_thread(void* arg) {
         if (packet.type == REG) {
 
             log_msg(client_info, "request register", NULL);
-
             int ret = request_register(&mysql, &packet, &user, client.sockfd);
-            if (ret == REG_SUCCESS) {
+            if (ret == SUCCESS) {
                 log_msg(client_info, "register success", NULL);
-            } else if (ret == REG_FAILED) {
+            } else if (ret == FAILED) {
                 log_msg(client_info, "register failed", NULL);
             } else {
                 log_msg(client_info, "register error", NULL);
@@ -173,11 +185,10 @@ void* client_thread(void* arg) {
         } else if (packet.type == LOGIN) {
 
             log_msg(client_info, "request login", NULL);
-
             int ret = request_login(&mysql, &packet, &user, client.sockfd);
-            if (ret == LOGIN_SUCCESS) {
+            if (ret == SUCCESS) {
                 log_msg(client_info, "login success", NULL);
-            } else if (ret == LOGIN_FAILED) {
+            } else if (ret == FAILED) {
                 log_msg(client_info, "login failed", NULL);
             } else {
                 log_msg(client_info, "login error", NULL);
@@ -186,23 +197,20 @@ void* client_thread(void* arg) {
         } else if (packet.type == NEWPWD) {
 
             log_msg(client_info, "request newpwd", NULL);
-
             int ret = request_newpwd(&mysql, &packet, &user, client.sockfd);
-            if (ret == NEWPWD_SUCCESS) {
+            if (ret == SUCCESS) {
                 log_msg(client_info, "newpwd success", NULL);
             } else {
                 log_msg(client_info, "newpwd error", NULL);
             }
 
-
         } else if (packet.type == SEARCH) {
 
             log_msg(client_info, user.name, "request search");
-
             int ret = request_search(&mysql, &packet, client.sockfd);
-            if (ret == SEARCH_SUCCESS) {
+            if (ret == SUCCESS) {
                 log_msg(client_info, user.name, "search success");
-            } else if (ret == SEARCH_FAILED) {
+            } else if (ret == FAILED) {
                 log_msg(client_info, user.name, "search failed");
             } else {
                 log_msg(client_info, user.name, "search error");
@@ -211,11 +219,10 @@ void* client_thread(void* arg) {
         } else if (packet.type == HISTORY) {
 
             log_msg(client_info, user.name, "request history");
-
             int ret = request_history(&mysql, &packet, &user, client.sockfd);
-            if (ret == HISTORY_SUCCESS) {
+            if (ret == SUCCESS) {
                 log_msg(client_info, user.name, "history success");
-            } else if (ret == HISTORY_FAILED) {
+            } else if (ret == FAILED) {
                 log_msg(client_info, user.name, "history failed");
             } else {
                 log_msg(client_info, user.name, "history error");
@@ -223,6 +230,7 @@ void* client_thread(void* arg) {
 
         } else if (packet.type == QUIT) {
             log_msg(client_info, user.name, "quit");
+
         }
     }
     log_msg(client_info, "disconnected", NULL);
@@ -239,7 +247,6 @@ int send_packet(int sockfd, int type, size_t size, void* data) {
     if (p == NULL) {
         return -1;
     }
-    reg_mem(p);
     p->type = type;
     p->size = size;
     if (data == NULL) {
@@ -258,7 +265,7 @@ int send_packet(int sockfd, int type, size_t size, void* data) {
 }
 
 //服务器端日志记录函数
-int log_msg(char* str1, char* str2, char* str3) {
+int log_msg(const char* str1, const char* str2, const char* str3) {
     time_t now;
     now = time(NULL);
     char* time_str = asctime(localtime(&now));
@@ -287,6 +294,7 @@ void signal_handler(int sig) {
     log_msg("server exit", NULL, NULL);
 
     struct rlimit rl;
+    //获取系统最大文件描述符
     getrlimit(RLIMIT_NOFILE, &rl);
     int max_fd = rl.rlim_max;
 
@@ -307,14 +315,4 @@ void signal_handler(int sig) {
     mem_count = 0;
     //退出程序
     exit(0);
-}
-
-//信号处理函数设置
-void setup_signal() {
-    struct sigaction sa;
-    sa.sa_handler = signal_handler;
-    sigemptyset(&sa.sa_mask);
-    sa.sa_flags = 0;
-    sigaction(SIGINT, &sa, NULL);
-    return;
 }

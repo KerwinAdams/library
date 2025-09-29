@@ -1,39 +1,44 @@
-# 编译器与编译选项
 CC = gcc
-CFLAGS = -Wall  -g   # -Wall 显示所有警告，-g 生成调试信息
-LDFLAGS = -lmysqlclient -pthread  # 同时链接 MySQL 客户端库和线程库（推荐用 -pthread）
+CFLAGS = -Wall -g
+LDFLAGS = -lmysqlclient -pthread
 
-# 要生成的可执行文件
+# 源文件分组（按实际依赖划分）
+SRCS_SERVER = server.c db.c       # 服务端源文件
+SRCS_CLIENT = client.c            # 客户端源文件
+SRCS_UTILS  = utils.c             # 工具类源文件
+
+# 生成目标文件列表（.c替换为.o）
+OBJS_SERVER = $(SRCS_SERVER:.c=.o)  # server.o db.o
+OBJS_CLIENT = $(SRCS_CLIENT:.c=.o)  # client.o
+OBJS_UTILS  = $(SRCS_UTILS:.c=.o)   # utils.o
+
+# 可执行文件目标
 TARGETS = server client
 
-# 伪目标：默认执行 all（生成所有可执行文件）
+# 伪目标（避免与同名文件冲突）
 .PHONY: all clean
+
+# 默认目标：编译所有可执行文件
 all: $(TARGETS)
 
-# 生成 server 可执行文件（链接 MySQL 和线程库）
-server: server.o db.o
-	$(CC) $(CFLAGS) -o server server.o db.o  $(LDFLAGS)
+# 通用模式规则：所有.c文件编译为.o文件
+%.o: %.c
+	$(CC) $(CFLAGS) -c $< -o $@
 
-# 编译 server.o（依赖 server.c、dict.h）
-server.o: server.c  dict.h
-	$(CC) $(CFLAGS) -c server.c
+# 显式头文件依赖（确保头文件修改时自动重编译）
+server.o: dict.h         # server.c依赖dict.h
+db.o: dict.h             # db.c依赖dict.h
+client.o: dict.h utils.h # client.c依赖dict.h和utils.h
+utils.o: utils.h dict.h  # utils.c依赖utils.h和dict.h
 
-# 编译 db.o（依赖 db.c、dict.h）
-db.o: db.c dict.h
-	$(CC) $(CFLAGS) -c db.c
+# 编译server：仅依赖服务端目标文件
+server: $(OBJS_SERVER)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
-# 编译 utils.o（依赖 utils.c、utils.h）
-utils.o: utils.c utils.h
-	$(CC) $(CFLAGS) -c utils.c
+# 编译client：依赖客户端目标文件和工具类目标文件
+client: $(OBJS_CLIENT) $(OBJS_UTILS)
+	$(CC) $(CFLAGS) -o $@ $^
 
-# 生成 client 可执行文件（无需链接数据库和线程库）
-client: client.o utils.o
-	$(CC) $(CFLAGS) -o client client.o utils.o
-
-# 编译 client.o（依赖 client.c、utils.h）
-client.o: client.c utils.h
-	$(CC) $(CFLAGS) -c client.c
-
-# 伪目标：清理编译产物
+# 清理编译产物
 clean:
-	rm -f $(TARGETS) *.o
+	rm -f $(TARGETS) $(OBJS_SERVER) $(OBJS_CLIENT) $(OBJS_UTILS)

@@ -8,6 +8,9 @@
 #include"dict.h"
 #include"utils.h"
 
+#define SERVER_PORT 8888
+#define SERVER_IP "127.0.0.1"
+
 int client_init(int argc, char* argv[]);
 int client_register(int sockfd, user_t* user);
 int client_login(int sockfd, user_t* user);
@@ -27,11 +30,13 @@ int main(int argc, char* argv[]) {
     packet_t client_start;
     recv(sockfd, &client_start, sizeof(packet_t), 0);
     if (client_start.type == ERROR) {
-        printf("Server error, please try again later!\n");
+        close(sockfd);
+        printf("Server loop error, please try again later!\n");
         return -1;
     }
     recv(sockfd, &client_start, sizeof(packet_t), 0);
     if (client_start.type == ERROR) {
+        close(sockfd);
         printf("Database init error, please try again later!\n");
         return -1;
     }
@@ -78,11 +83,6 @@ int client_init(int argc, char* argv[]) {
 
     prompt(1, NULL, 0);
 
-    if (argc != 3) {
-        printf("Usage: %s <ip> <port>\n", argv[0]);
-        return -1;
-    }
-
     int sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (sockfd < 0) {
         perror("socket error");
@@ -91,8 +91,8 @@ int client_init(int argc, char* argv[]) {
 
     struct sockaddr_in server_addr;
     server_addr.sin_family = AF_INET;
-    server_addr.sin_port = htons(atoi(argv[2]));
-    server_addr.sin_addr.s_addr = inet_addr(argv[1]);
+    server_addr.sin_port = htons(SERVER_PORT);
+    server_addr.sin_addr.s_addr = inet_addr(SERVER_IP);
 
     if (connect(sockfd, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0) {
         perror("connect error");
@@ -107,7 +107,7 @@ int client_register(int sockfd, user_t* user) {
 
     prompt(1, "Please enter your username:", 1);
     str_input(user->name, 31, NULL);
-    prompt(0, "Please enter your password:", 0);
+    printf("Please enter your password:\n");
     str_input(user->password, 31, NULL);
 
     if (send_packet(sockfd, REG, sizeof(user_t), user) == -1) {
@@ -117,9 +117,9 @@ int client_register(int sockfd, user_t* user) {
 
     packet_t packet = { 0 };
     recv(sockfd, &packet, sizeof(packet_t), 0);
-    if (packet.type == REG_SUCCESS) {
+    if (packet.type == SUCCESS) {
         prompt(1, "Register success!", 3);
-    } else if (packet.type == REG_FAILED) {
+    } else if (packet.type == FAILED) {
         prompt(1, "Username already exists!", 3);
         return -1;
     } else if (packet.type == ERROR) {
@@ -144,10 +144,10 @@ int client_login(int sockfd, user_t* user) {
 
     packet_t packet = { 0 };
     recv(sockfd, &packet, sizeof(packet_t), 0);
-    if (packet.type == LOGIN_SUCCESS) {
+    if (packet.type == SUCCESS) {
         prompt(1, "Login success!", 3);
-    } else if (packet.type == LOGIN_FAILED) {
-        prompt(1, "Username or password error!", 3);
+    } else if (packet.type == FAILED) {
+        prompt(1, "Incorrect username or password!", 3);
         return -1;
     } else if (packet.type == ERROR) {
         prompt(1, "Error!", 3);
@@ -206,7 +206,7 @@ void client_func_newpwd(int sockfd, packet_t* packet, user_t* user) {
     }
 
     recv(sockfd, packet, sizeof(packet_t), 0);
-    if (packet->type == NEWPWD_SUCCESS) {
+    if (packet->type == SUCCESS) {
         prompt(1, "Change password success!", 3);
     } else if (packet->type == ERROR) {
         prompt(1, "Error!", 3);
@@ -235,11 +235,11 @@ void client_func_search(int sockfd, packet_t* packet, user_t* user) {
 
     char meaning[256] = { 0 };
     recv(sockfd, packet, sizeof(packet_t), 0);
-    if (packet->type == SEARCH_SUCCESS) {
+    if (packet->type == SUCCESS) {
         recv(sockfd, meaning, packet->size, 0);
         prompt(1, word, 1);
         prompt(0, meaning, 2);
-    } else if (packet->type == SEARCH_FAILED) {
+    } else if (packet->type == FAILED) {
         prompt(1, "Word not found!", 3);
     } else if (packet->type == ERROR) {
         prompt(1, "Error!", 3);
@@ -256,7 +256,7 @@ void client_func_history(int sockfd, packet_t* packet, user_t* user) {
 
     recv(sockfd, packet, sizeof(packet_t), 0);
 
-    if (packet->type == HISTORY_SUCCESS) {
+    if (packet->type == SUCCESS) {
         prompt(1, NULL, 1);
         printf("+---------------------------------------------------------------+\n");
         printf("|  Time                      |  Word                            |\n");
@@ -272,7 +272,7 @@ void client_func_history(int sockfd, packet_t* packet, user_t* user) {
             recv(sockfd, &history, packet->size, 0);
             printf("|  %s  |  %-32s|\n", history.time, history.word);
         }
-    } else if (packet->type == HISTORY_FAILED) {
+    } else if (packet->type == FAILED) {
         prompt(1, "History not found!", 3);
     } else if (packet->type == ERROR) {
         prompt(1, "Error!", 3);
